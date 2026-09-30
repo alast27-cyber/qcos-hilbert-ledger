@@ -1,0 +1,23 @@
+qcos-standalone/
+└── hilbert-ledger/
+    ├── Makefile                     <-- Build & execution orchestrator
+    ├── Cargo.toml                   <-- Crate dependencies
+    ├── Dockerfile.standalone        <-- Isolated container definition
+    ├── config/
+    │   └── ledger_daemon.toml       <-- Restricted to AgentQ & GUS
+    ├── src/
+    │   ├── main.rs                  <-- UNIX Socket Server Daemon
+    │   ├── ledger.rs                <-- Shift Operator |n> -> |2n> & EAP Logic
+    │   ├── agent_q_reasoning.rs     <-- AgentQ Cognitive Loop Bridge
+    │   ├── gus_physics_loop.rs      <-- GUS Physics Frame Bridge
+    │   └── bin/
+    │       └── agent_gus_runtime.rs <-- Dual-Engine Execution Driver
+    ├── clients/
+    │   ├── hilbert_client.py        <-- Python IPC Client
+    │   └── agent_gus_bridge.rs      <-- Async Rust IPC Client
+    ├── scripts/
+    │   ├── run_daemon.sh            <-- Shell launch script
+    │   └── qcos-hilbert-ledger.service <-- systemd service unit
+    └── tests/
+        ├── ipc_integration_test.rs  <-- Socket & Auth unit tests
+        └── system_e2e_test.rs       <-- End-to-end AgentQ + GUS lifecycle test

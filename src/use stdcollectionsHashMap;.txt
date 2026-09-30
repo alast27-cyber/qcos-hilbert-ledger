@@ -1,0 +1,153 @@
+use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+
+/// Represents an incoming EAP state injection payload
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct EapStatePayload {
+    pub client_id: String,
+    pub mode_index: usize,
+    pub amplitude_re: f64,
+    pub amplitude_im: f64,
+}
+
+/// Thread-safe or local registry tracking active quantum states and probabilities
+#[derive(Debug, Default)]
+pub struct SemanticNodeRegistry {
+    // Maps mode_index -> computed probability P (Re^2 + Im^2)
+    pub active_probabilities: HashMap<usize, f64>,
+}
+
+impl SemanticNodeRegistry {
+    pub fn new() -> Self {
+        Self {
+            active_probabilities: HashMap::new(),
+        }
+    }
+
+    /// Ingests an EAP payload, computes quantum state probability, and updates registry
+    pub fn ingest_payload(&mut self, payload: &EapStatePayload) {
+        let probability = (payload.amplitude_re * payload.amplitude_re) 
+                        + (payload.amplitude_im * payload.amplitude_im);
+        
+        self.active_probabilities.insert(payload.mode_index, probability);
+    }
+
+    /// Bulk updates from batch injections
+    pub fn ingest_batch(&mut self, payloads: &[EapStatePayload]) {
+        for p in payloads {
+            self.ingest_payload(p);
+        }
+    }
+}
+
+/// Node structure for the QLLM Semantic Probability Tree
+#[derive(Debug, Clone)]
+pub struct SemanticTreeNode {
+    pub token_id: u32,
+    pub token_text: String,
+    pub mode_index: usize,
+    pub base_score: f64,
+    pub children: Vec<SemanticTreeNode>,
+}
+
+impl SemanticTreeNode {
+    pub fn new(token_id: u32, token_text: &str, mode_index: usize, base_score: f64) -> Self {
+        Self {
+            token_id,
+            token_text: token_text.to_string(),
+            mode_index,
+            base_score,
+            children: Vec::new(),
+        }
+    }
+
+    pub fn add_child(&mut self, child: SemanticTreeNode) {
+        self.children.push(child);
+    }
+}
+
+/// Pruning Engine: Evaluates semantic tree against ledger registry and threshold
+pub struct QLLMPruner {
+    pub pruning_threshold: f64,
+}
+
+impl QLLMPruner {
+    pub fn new(pruning_threshold: f64) -> Self {
+        Self { pruning_threshold }
+    }
+
+    /// Recursively traverses the semantic probability tree, evaluating node weights
+    /// against ledger quantum states and pruning branches below the threshold.
+    pub fn evaluate_and_prune(
+        &self,
+        node: &mut SemanticTreeNode,
+        registry: &SemanticNodeRegistry,
+        pruned_count: &mut usize,
+    ) {
+        node.children.retain_mut(|child| {
+            // Retrieve quantum probability from ledger registry.
+            // Defaults to base_score if no explicit quantum injection exists for this mode.
+            let quantum_prob = registry
+                .active_probabilities
+                .get(&child.mode_index)
+                .copied()
+                .unwrap_or(child.base_score);
+
+            if quantum_prob < self.pruning_threshold {
+                *pruned_count += 1;
+                // Returning false drops this child node and its entire subtree from generation queue
+                false
+            } else {
+                // Recurse deeper down surviving branches
+                self.evaluate_and_prune(child, registry, pruned_count);
+                true
+            }
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    test_tree_pruning() {
+        let mut registry = SemanticNodeRegistry::new();
+        
+        // Inject EAP state: mode 0 has high amplitude (P = 0.5 + 0.5 = 1.0)
+        registry.ingest_payload(&EapStatePayload {
+            client_id: "node_01".into(),
+            mode_index: 0,
+            amplitude_re: 0.7071,
+            amplitude_im: 0.7071,
+        });
+
+        // Inject EAP state: mode 1 has near-zero amplitude (P = 0.01)
+        registry.ingest_payload(&EapStatePayload {
+            client_id: "node_01".into(),
+            mode_index: 1,
+            amplitude_re: 0.1,
+            amplitude_im: 0.0,
+        });
+
+        // Build a sample QLLM semantic tree
+        let mut root = SemanticTreeNode::new(0, "<ROOT>", 0, 1.0);
+        let mut survive_branch = SemanticTreeNode::new(101, "Quantum", 0, 0.8);
+        let mut prune_branch = SemanticTreeNode::new(102, "Classical", 1, 0.2);
+
+        survive_branch.add_child(SemanticTreeNode::new(201, "Computing", 0, 0.9));
+        root.add_child(survive_branch);
+        root.add_child(prune_branch);
+
+        // Run pruner with threshold 0.05
+        let pruner = QLLMPruner::new(0.05);
+        let mut pruned_total = 0;
+
+        pruner.evaluate_and_prune(&mut root, &registry, &mut pruned_total);
+
+        // Assertions
+        assert_eq!(root.children.len(), 1); // "Classical" branch (mode 1, P=0.01) should be pruned
+        assert_eq!(root.children[0].token_text, "Quantum");
+        assert_eq!(pruned_total, 1);
+    }
+}

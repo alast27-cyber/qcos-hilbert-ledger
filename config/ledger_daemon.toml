@@ -1,0 +1,6 @@
+[server]
+ipc_socket_path = "\\\\.\\pipe\\qcos_hilbert_ledger"
+gamma_decay = 0.05
+
+[security]
+authorized_clients = ["AgentQ", "GUS", "GUS_PHYSICS_ENGINE", "CLL"]

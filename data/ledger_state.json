@@ -1,0 +1,59 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::{BufReader, BufWriter};
+use std::path::Path;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LedgerSnapshot {
+    pub modes: HashMap<u64, f64>,
+    pub consensus_score: f64,
+    pub last_updated: String,
+}
+
+pub struct PersistentHilbertLedger {
+    pub state_file: String,
+    pub snapshot: LedgerSnapshot,
+}
+
+impl PersistentHilbertLedger {
+    pub fn new(state_file: &str) -> Self {
+        let path = Path::new(state_file);
+        
+        // Load existing state from disk or initialize clean ledger
+        let snapshot = if path.exists() {
+            println!("[Persistence] Hydrating ledger state from: {}", state_file);
+            let file = File::open(path).expect("Failed to open state file");
+            let reader = BufReader::new(file);
+            serde_json::from_reader(reader).unwrap_or_else(|_| Self::default_snapshot())
+        } else {
+            println!("[Persistence] No snapshot found. Initializing new ledger file.");
+            Self::default_snapshot()
+        };
+
+        PersistentHilbertLedger {
+            state_file: state_file.to_string(),
+            snapshot,
+        }
+    }
+
+    fn default_snapshot() -> LedgerSnapshot {
+        LedgerSnapshot {
+            modes: HashMap::new(),
+            consensus_score: 1.0,
+            last_updated: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+
+    pub fn save_to_disk(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(parent) = Path::new(&self.state_file).parent() {
+            fs::create_dir_all(parent)?;
+        }
+        
+        self.snapshot.last_updated = chrono::Utc::now().to_rfc3339();
+        let file = File::create(&self.state_file)?;
+        let writer = BufWriter::new(file);
+        serde_json::to_writer_pretty(writer, &self.snapshot)?;
+        Ok(())
+    }
+}

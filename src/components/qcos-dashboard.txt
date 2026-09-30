@@ -1,0 +1,8 @@
+qcos-dashboard/
+├── src/
+│   ├── hooks/
+│   │   └── useLedgerStream.ts
+│   ├── components/
+│   │   └── QCOSDashboard.tsx   <-- Place component here
+│   ├── App.tsx
+│   └── main.tsx

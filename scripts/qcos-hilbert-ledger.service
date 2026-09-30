@@ -1,0 +1,19 @@
+[Unit]
+Description=QCOS Standalone Hilbert Hotel Ledger Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/qcos-standalone/hilbert-ledger
+ExecStart=/opt/qcos-standalone/hilbert-ledger/target/release/qcos-hilbert-ledger
+Restart=always
+RestartSec=3s
+PermissionsStartOnly=true
+
+# Security isolation
+ProtectSystem=full
+PrivateTmp=false
+
+[Install]
+WantedBy=multi-user.target
