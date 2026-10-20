@@ -1,4 +1,5 @@
-﻿import React from 'react';
+import React from 'react';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
           [SYSTEM] Dashboard online and synced with production Vercel pipeline.
         </div>
       </div>
+      <Analytics />
     </main>
   );
 }
